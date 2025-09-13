@@ -9,7 +9,7 @@ import json
 # =======================
 # Configure Google Gemini
 # =======================
-API_KEY = os.getenv("AIzaSyDwLb1uxD_ALQJLOvu5tzpUqINZcKKl3KQ")  # Make sure to set this in your environment
+API_KEY = os.getenv("give your api key")  # Make sure to set this in your environment
 if not API_KEY:
     raise RuntimeError("❌ GOOGLE_API_KEY not set in environment variables")
 genai.configure(api_key=API_KEY)
@@ -132,3 +132,4 @@ async def ask_question(request: Request):
 
     except Exception as e:
         return {"answer": f"❌ Error: {str(e)}"}
+
