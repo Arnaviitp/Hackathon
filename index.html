@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Legal Document Assistant</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ================= Global ================= */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background: linear-gradient(135deg, #eef2f7, #dbe6f5);
+        color: #333;
+      }
+      header {
+        background: #1e88e5;
+        color: #fff;
+        text-align: center;
+        padding: 25px;
+        font-size: 2rem;
+        font-weight: 700;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      }
+      main {
+        max-width: 1000px;
+        margin: 40px auto;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+        padding: 0 20px;
+      }
+
+      /* ================= Card ================= */
+      .card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 30px 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        transition: transform 0.3s, box-shadow 0.3s;
+      }
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+      }
+      h2 {
+        color: #1e88e5;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+      }
+
+      /* ================= Inputs ================= */
+      input[type="file"],
+      input[type="text"] {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #d0d7e0;
+        border-radius: 12px;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        margin-bottom: 15px;
+      }
+      input[type="file"]:focus,
+      input[type="text"]:focus {
+        border-color: #1e88e5;
+        box-shadow: 0 0 10px rgba(30, 136, 229, 0.2);
+      }
+
+      button {
+        background: #1e88e5;
+        color: #fff;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s, transform 0.2s;
+      }
+      button:hover {
+        background: #1565c0;
+        transform: scale(1.05);
+      }
+
+      /* ================= Output ================= */
+      .output,
+      .qa-output,
+      #uploadStatus,
+      #qaStatus {
+        margin-top: 15px;
+        padding: 15px;
+        border-radius: 12px;
+        background: #f4f6f9;
+        border-left: 5px solid #1e88e5;
+        font-size: 1rem;
+        white-space: pre-line;
+      }
+      .spinner {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ================= Drag & Drop ================= */
+      #dropArea {
+        border: 2px dashed #1e88e5;
+        padding: 30px;
+        text-align: center;
+        border-radius: 15px;
+        transition: background 0.3s, border-color 0.3s;
+        cursor: pointer;
+        margin-bottom: 15px;
+        color: #1e88e5;
+        font-weight: 500;
+      }
+      #dropArea.hover {
+        background: #e3f2fd;
+        border-color: #1565c0;
+      }
+
+      footer {
+        text-align: center;
+        padding: 20px;
+        background: #1e88e5;
+        color: #fff;
+        margin-top: 50px;
+        border-radius: 0 0 20px 20px;
+        font-weight: 500;
+        font-size: 1rem;
+      }
+
+      /* ================= Responsive ================= */
+      @media (max-width: 768px) {
+        main {
+          gap: 30px;
+        }
+        button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>⚖️ AI Legal Document Assistant</header>
+    <main>
+      <!-- Upload Card -->
+      <div class="card">
+        <h2>Upload Legal Document</h2>
+        <div id="dropArea">Drag & Drop PDF/DOCX here or click to select</div>
+        <input type="file" id="fileInput" hidden />
+        <button onclick="uploadDocument()">Upload & Summarize</button>
+        <div id="fileName" style="margin-top: 10px; font-weight: 500"></div>
+        <div id="uploadStatus"></div>
+        <div id="summaryOutput" class="output"></div>
+      </div>
+
+      <!-- Q&A Card -->
+      <div class="card">
+        <h2>Ask Questions</h2>
+        <input type="text" id="questionInput" placeholder="Ask something..." />
+        <button onclick="askQuestion()">Ask</button>
+        <div id="qaStatus"></div>
+        <div id="qaOutput" class="qa-output"></div>
+      </div>
+    </main>
+    <footer>Built with ❤️ using Generative AI for Legal Tech</footer>
+
+    <script>
+      const backendUrl = "http://127.0.0.1:8000";
+
+      const fileInput = document.getElementById("fileInput");
+      const dropArea = document.getElementById("dropArea");
+      const fileNameDisplay = document.getElementById("fileName");
+
+      // Drag & Drop
+      dropArea.addEventListener("click", () => fileInput.click());
+      dropArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropArea.classList.add("hover");
+      });
+      dropArea.addEventListener("dragleave", () =>
+        dropArea.classList.remove("hover")
+      );
+      dropArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropArea.classList.remove("hover");
+        const file = e.dataTransfer.files[0];
+        fileInput.files = e.dataTransfer.files;
+        fileNameDisplay.textContent = `📄 Selected: ${file.name}`;
+      });
+
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        if (file) fileNameDisplay.textContent = `📄 Selected: ${file.name}`;
+      });
+
+      // Loading indicator
+      function setLoading(el, message, isLoading = true) {
+        if (isLoading)
+          el.innerHTML = `${message} <span class="spinner">⏳</span>`;
+        else el.textContent = "";
+      }
+
+      // Upload & Summarize
+      async function uploadDocument() {
+        const file = fileInput.files[0];
+        const status = document.getElementById("uploadStatus");
+        const output = document.getElementById("summaryOutput");
+
+        if (!file) {
+          alert("Please select a file first.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        setLoading(status, "Uploading and summarizing...");
+        output.textContent = "";
+
+        try {
+          const response = await fetch(`${backendUrl}/upload`, {
+            method: "POST",
+            body: formData,
+          });
+          const data = await response.json();
+          setLoading(status, "", false);
+
+          output.textContent = data.summary.startsWith("❌")
+            ? `⚠️ Error:\n${data.summary}`
+            : `📄 Summary:\n${data.summary}`;
+        } catch (err) {
+          console.error(err);
+          setLoading(status, "", false);
+          output.textContent = "❌ Failed to upload or summarize file.";
+        }
+      }
+
+      // Ask Question
+      async function askQuestion() {
+        const question = document.getElementById("questionInput").value;
+        const status = document.getElementById("qaStatus");
+        const output = document.getElementById("qaOutput");
+
+        if (!question.trim()) {
+          alert("Enter a question first!");
+          return;
+        }
+
+        setLoading(status, "Getting answer...");
+        output.textContent = "";
+
+        try {
+          const response = await fetch(`${backendUrl}/ask`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question }),
+          });
+          const data = await response.json();
+          setLoading(status, "", false);
+
+          output.textContent = data.answer.startsWith("❌")
+            ? `⚠️ Error:\n${data.answer}`
+            : `💡 Answer:\n${data.answer}`;
+        } catch (err) {
+          console.error(err);
+          setLoading(status, "", false);
+          output.textContent = "❌ Failed to get answer.";
+        }
+      }
+    </script>
+  </body>
+</html>
