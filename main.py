@@ -13,7 +13,7 @@ import json
 # =======================
 # Configure Google Gemini
 # =======================
-API_KEY = os.getenv("AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs")  # Ensure this is set in your .env
+API_KEY = os.getenv(Give Google API)  # Ensure this is set in your .env
 if not API_KEY:
     raise RuntimeError("❌ GOOGLE_API_KEY not set in environment variables")
 
