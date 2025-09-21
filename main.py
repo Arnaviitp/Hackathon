@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from dotenv import load_dotenv
-load_dotenv()
 import os
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,41 +7,39 @@ from fastapi.responses import FileResponse
 from docx import Document
 import pdfplumber
 import google.generativeai as genai
-import json
+
+load_dotenv()  # Load .env
 
 # =======================
 # Configure Google Gemini
 # =======================
-API_KEY = os.getenv("GOOGLE_API_KEY")  # .env should have GOOGLE_API_KEY=your_key
+API_KEY = os.getenv("GOOGLE_API_KEY")
 if not API_KEY:
     raise RuntimeError("❌ GOOGLE_API_KEY not set in environment variables")
 
-genai.configure(api_key="AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs")
+genai.configure(api_key=API_KEY)
 
 app = FastAPI()
 
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for dev; restrict in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===== Favicon route =====
-@app.get("/favicon.ico")
-async def favicon():
-    if os.path.exists("favicon.ico"):
-        return FileResponse("favicon.ico")
-    return {"message": "⚠️ No favicon found"}
+@app.get("/")
+async def root():
+    return {"status": "✅ FastAPI with Gemini is running!"}
 
-# Store last uploaded text for Q&A
+# Store last uploaded text
 last_uploaded_text = ""
 
 
 # =======================
-# Helper Functions
+# Helpers
 # =======================
 def extract_text_from_pdf(file_path: str) -> str:
     text = ""
@@ -59,67 +56,48 @@ def extract_text_from_docx(file_path: str) -> str:
     return " ".join([p.text.strip() for p in doc.paragraphs if p.text.strip()])
 
 
-def extract_from_gemini_response(response) -> str:
-    """Extract text from Gemini response robustly."""
+def safe_extract(response) -> str:
+    """Safely extract Gemini response text."""
     try:
         if hasattr(response, "text") and response.text:
             return response.text.strip()
-
-        resp_json = json.loads(response.to_json())
-        if "candidates" in resp_json:
-            for cand in resp_json["candidates"]:
-                if "content" in cand and "parts" in cand["content"]:
-                    for part in cand["content"]["parts"]:
-                        if "text" in part:
-                            return part["text"].strip()
-
-        return "⚠️ No usable text found in Gemini response."
+        return str(response)
     except Exception as e:
-        return f"⚠️ Error parsing Gemini response: {str(e)}"
+        return f"⚠️ Failed to parse Gemini response: {e}"
 
 
 # =======================
 # Routes
 # =======================
-
-@app.get("/")
-async def root():
-    return {"message": "✅ FastAPI server is running!"}
-
-
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     global last_uploaded_text
     file_path = f"temp_{file.filename}"
+
     try:
         contents = await file.read()
         with open(file_path, "wb") as f:
             f.write(contents)
 
-        # Extract text
         if file.filename.lower().endswith(".pdf"):
             text = extract_text_from_pdf(file_path)
         elif file.filename.lower().endswith(".docx"):
             text = extract_text_from_docx(file_path)
         else:
-            return {"summary": "❌ Unsupported format. Upload PDF or DOCX."}
+            return {"summary": "❌ Only PDF or DOCX allowed."}
 
         if not text:
             return {"summary": "❌ No text found in document."}
 
-        last_uploaded_text = text  # Save for Q&A
+        last_uploaded_text = text
 
-        # Summarize with Gemini (trim to 4000 chars)
+        # Summarize
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(
-            f"Summarize this legal document in simple, clear language:\n\n{text[:4000]}"
+            f"Summarize this legal document in clear, simple language:\n\n{text[:4000]}"
         )
 
-        summary_text = extract_from_gemini_response(response)
-        return {"summary": summary_text}
-
-    except Exception as e:
-        return {"summary": f"❌ Error: {str(e)}"}
+        return {"summary": safe_extract(response)}
 
     finally:
         if os.path.exists(file_path):
@@ -138,19 +116,14 @@ async def ask_question(payload: Question):
     if not question:
         return {"answer": "❌ Please provide a valid question."}
 
-    context = last_uploaded_text or "No document uploaded. Answer generally."
+    context = last_uploaded_text or "No document uploaded."
 
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(
-            f"Based on this legal document:\n\n{context[:4000]}\n\nQuestion: {question}\nAnswer clearly:"
-        )
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content(
+        f"Document:\n{context[:4000]}\n\nQuestion: {question}\nAnswer clearly:"
+    )
 
-        answer_text = extract_from_gemini_response(response)
-    except Exception as e:
-        answer_text = f"❌ Error: {str(e)}"
-
-    return {"answer": answer_text}
+    return {"answer": safe_extract(response)}
 
 
 # =======================
@@ -159,5 +132,6 @@ async def ask_question(payload: Question):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+
 
 
