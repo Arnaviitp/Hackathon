@@ -17,7 +17,7 @@ API_KEY = os.getenv("GOOGLE_API_KEY")
 if not API_KEY:
     raise RuntimeError("❌ GOOGLE_API_KEY not set in environment variables")
 
-genai.configure(api_key=API_KEY)
+genai.configure(api_key=AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs)
 
 app = FastAPI()
 
@@ -132,6 +132,7 @@ async def ask_question(payload: Question):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+
 
 
 
