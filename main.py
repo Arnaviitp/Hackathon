@@ -1,23 +1,17 @@
 from pydantic import BaseModel
-from dotenv import load_dotenv
-import os
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from docx import Document
 import pdfplumber
 import google.generativeai as genai
-
-load_dotenv()  # Load .env
+import os
 
 # =======================
 # Configure Google Gemini
 # =======================
-API_KEY = os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    raise RuntimeError("❌ GOOGLE_API_KEY not set in environment variables")
-
-genai.configure(api_key=AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs)
+API_KEY = "AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs"   
+genai.configure(api_key=API_KEY)
 
 app = FastAPI()
 
@@ -132,7 +126,3 @@ async def ask_question(payload: Question):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
-
-
-
-
