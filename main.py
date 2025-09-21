@@ -13,11 +13,11 @@ import json
 # =======================
 # Configure Google Gemini
 # =======================
-API_KEY = os.getenv(Give Google API)  # Ensure this is set in your .env
+API_KEY = os.getenv("GOOGLE_API_KEY")  # .env should have GOOGLE_API_KEY=your_key
 if not API_KEY:
     raise RuntimeError("❌ GOOGLE_API_KEY not set in environment variables")
 
-genai.configure(api_key="AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs")
+genai.configure(api_key=AIzaSyAglmbD-0n7vtBdsbHqagK7L6fehc5M1rs)
 
 app = FastAPI()
 
@@ -33,7 +33,9 @@ app.add_middleware(
 # ===== Favicon route =====
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse("favicon.ico")  # Make sure favicon.ico exists in project folder
+    if os.path.exists("favicon.ico"):
+        return FileResponse("favicon.ico")
+    return {"message": "⚠️ No favicon found"}
 
 # Store last uploaded text for Q&A
 last_uploaded_text = ""
@@ -60,11 +62,9 @@ def extract_text_from_docx(file_path: str) -> str:
 def extract_from_gemini_response(response) -> str:
     """Extract text from Gemini response robustly."""
     try:
-        # Direct text attribute
         if hasattr(response, "text") and response.text:
             return response.text.strip()
 
-        # Fallback: JSON parsing
         resp_json = json.loads(response.to_json())
         if "candidates" in resp_json:
             for cand in resp_json["candidates"]:
@@ -82,10 +82,9 @@ def extract_from_gemini_response(response) -> str:
 # Routes
 # =======================
 
-# Simple GET route to test server
 @app.get("/")
 async def root():
-    return {"message": "FastAPI server is running!"}
+    return {"message": "✅ FastAPI server is running!"}
 
 
 @app.post("/upload")
@@ -120,7 +119,6 @@ async def upload_file(file: UploadFile = File(...)):
         return {"summary": summary_text}
 
     except Exception as e:
-        print("Error in /upload:", e)
         return {"summary": f"❌ Error: {str(e)}"}
 
     finally:
@@ -150,11 +148,15 @@ async def ask_question(payload: Question):
 
         answer_text = extract_from_gemini_response(response)
     except Exception as e:
-        print("Error in /ask:", e)
         answer_text = f"❌ Error: {str(e)}"
 
     return {"answer": answer_text}
 
 
-
+# =======================
+# Deployment Entry Point
+# =======================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
 
